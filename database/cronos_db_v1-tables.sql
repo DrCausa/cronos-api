@@ -1,0 +1,188 @@
+USE cronos_db_v1;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS `time_entry_tag`;
+DROP TABLE IF EXISTS time_entry;
+
+DROP TABLE IF EXISTS tag;
+DROP TABLE IF EXISTS task;
+
+DROP TABLE IF EXISTS project;
+
+DROP TABLE IF EXISTS workspace_group_member;
+DROP TABLE IF EXISTS workspace_member;
+DROP TABLE IF EXISTS workspace_group;
+DROP TABLE IF EXISTS workspace;
+
+DROP TABLE IF EXISTS `role_permission`;
+DROP TABLE IF EXISTS `user_role`;
+
+DROP TABLE IF EXISTS permission;
+DROP TABLE IF EXISTS `role`;
+DROP TABLE IF EXISTS `user`;
+
+-- SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE `user` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    pwd_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(250) NULL UNIQUE,
+    `status` ENUM('ACTIVE', 'SUSPENDED', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `role` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    `code` VARCHAR(250) NOT NULL UNIQUE,
+    label VARCHAR(250) NOT NULL,
+    `description` TEXT NULL,
+    bg_color VARCHAR(7) NOT NULL DEFAULT '#000000',
+    fg_color VARCHAR(7) NOT NULL DEFAULT '#FFFFFF',
+    `status` ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE permission (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    `code` VARCHAR(250) NOT NULL UNIQUE,
+    `description` TEXT NULL,
+    `status` ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE user_role (
+    user_id INT NOT NULL,
+    role_id INT NOT NULL,
+    observations TEXT NULL,
+    executed_by ENUM('USER', 'SYSTEM') DEFAULT 'SYSTEM',
+    executor_id INT NULL,
+    expired_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, role_id),
+    FOREIGN KEY (user_id) REFERENCES `user`(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES `role`(id) ON DELETE CASCADE,
+    FOREIGN KEY (executor_id) REFERENCES `user`(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE role_permission (
+    role_id INT NOT NULL,
+    permission_id INT NOT NULL,
+    observations TEXT NULL,
+    executed_by ENUM('USER', 'SYSTEM') DEFAULT 'SYSTEM',
+    executor_id INT NULL,
+    expired_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES `role`(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permission(id) ON DELETE CASCADE,
+    FOREIGN KEY (executor_id) REFERENCES `user`(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE workspace (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(250) NOT NULL,
+    `description` TEXT NULL,
+    owner_id INT NOT NULL,
+    `status` ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES `user`(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE workspace_group (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    workspace_id INT NOT NULL,
+    `name` VARCHAR(250) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_group_per_workspace (workspace_id, `name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE workspace_member (
+    workspace_id INT NOT NULL,
+    user_id INT NOT NULL,
+    `role` ENUM('OWNER', 'ADMIN', 'MEMBER') NOT NULL DEFAULT 'MEMBER',
+    observations TEXT NULL,
+    executed_by ENUM('USER', 'SYSTEM') DEFAULT 'SYSTEM',
+    executor_id INT NULL,
+    expired_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (workspace_id, user_id),
+    FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES `user`(id) ON DELETE CASCADE,
+    FOREIGN KEY (executor_id) REFERENCES `user`(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE workspace_group_member (
+    workspace_id INT NOT NULL,
+    user_id INT NOT NULL,
+    workspace_group_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (workspace_id, user_id, workspace_group_id),
+    FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_member(workspace_id, user_id) ON DELETE CASCADE,
+    FOREIGN KEY (workspace_group_id) REFERENCES workspace_group(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE project (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    workspace_id INT NOT NULL,
+    `name` VARCHAR(250) NOT NULL,
+    `description` TEXT NULL,
+    color_hex VARCHAR(7) NOT NULL DEFAULT '#4CAF50',
+    `status` ENUM('ACTIVE', 'ARCHIVED', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE task (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    project_id INT NOT NULL,
+    `name` VARCHAR(250) NOT NULL,
+    `status` ENUM('OPEN', 'DONE') NOT NULL DEFAULT 'OPEN',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE tag (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    workspace_id INT NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    color_hex VARCHAR(7) NOT NULL DEFAULT '#9C27B0',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_tag_per_workspace (workspace_id, `name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE time_entry (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    workspace_id INT NOT NULL,
+    user_id INT NOT NULL,
+    project_id INT NULL,
+    task_id INT NULL,
+    `description` TEXT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES `user`(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE SET NULL,
+    FOREIGN KEY (task_id) REFERENCES task(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `time_entry_tag` (
+    time_entry_id INT NOT NULL,
+    tag_id INT NOT NULL,
+    PRIMARY KEY (time_entry_id, tag_id),
+    FOREIGN KEY (time_entry_id) REFERENCES time_entry(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tag(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;

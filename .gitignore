@@ -1,0 +1,18 @@
+# Archivos compilados de Maven
+target/
+*.jar
+*.war
+
+# Archivos de entorno y secretos
+.env
+cli-commands.txt
+dev-tokens.txt
+
+# Archivos específicos de NetBeans
+nbproject/private/
+nbactions.xml
+nb-configuration.xml
+
+# Archivos de SO
+.DS_Store
+Thumbs.db
